@@ -1,0 +1,142 @@
+- name: Create an instance
+  hosts: localhost
+  gather_facts: no
+  vars:
+      gcp_project: openshift-demo-320707
+      gcp_cred_kind: serviceaccount
+      gcp_cred_file: "/Users/champillon/SandBox/ansible-playground/gcp-key/openshift-demo-320707-46b48f11b55a.json"
+      zone: "us-central1-a"
+      region: "us-central1"
+
+  tasks:
+    - name: create a disk
+      gcp_compute_disk:
+         name: 'jenkins-disk'
+         size_gb: 50
+         source_image: 'projects/rhel-cloud/global/images/rhel-7-v20211105'
+         zone: "{{ zone }}"
+         project: "{{ gcp_project }}"
+         auth_kind: "{{ gcp_cred_kind }}"
+         service_account_file: "{{ gcp_cred_file }}"
+         scopes:
+           - https://www.googleapis.com/auth/compute
+         state: present
+      register: disk
+    - name: create a address
+      gcp_compute_address:
+         name: 'jenkins-address'
+         region: "{{ region }}"
+         project: "{{ gcp_project }}"
+         auth_kind: "{{ gcp_cred_kind }}"
+         service_account_file: "{{ gcp_cred_file }}"
+         scopes:
+           - https://www.googleapis.com/auth/compute
+         state: present
+      register: address
+    - name: create a firewall
+      gcp_compute_firewall:
+        name: 'jenkins-firewall'
+        allowed:
+          - ip_protocol: 'tcp'
+            ports:
+              - "8080"
+        target_tags:
+          - http-8080
+        project: "{{ gcp_project }}"
+        auth_kind: "{{ gcp_cred_kind }}"
+        service_account_file: "{{ gcp_cred_file }}"
+        scopes:
+           - https://www.googleapis.com/auth/compute
+        state: present
+    - name: create a instance
+      gcp_compute_instance:
+        state: present
+        name: jenkins-vm
+        machine_type: n1-standard-1
+        disks:
+          - auto_delete: true
+            boot: true
+            source: "{{ disk }}"
+        network_interfaces:
+          - network: null # use default
+            access_configs:
+              - name: 'External NAT'
+                nat_ip: "{{ address }}"
+                type: 'ONE_TO_ONE_NAT'
+        zone: "{{ zone }}"
+        project: "{{ gcp_project }}"
+        auth_kind: "{{ gcp_cred_kind }}"
+        service_account_file: "{{ gcp_cred_file }}"
+        scopes:
+          - https://www.googleapis.com/auth/compute
+        tags:
+          items:
+            - http-8080
+      register: instance
+
+    - name: Wait for SSH to come up
+      wait_for: host={{ address.address }} port=22 delay=10 timeout=60
+
+    - name: Add host to groupname
+      add_host: hostname={{ address.address }} groupname=new_instances
+      
+- name: Install jenkins
+  hosts: new_instances
+  connection: ssh
+  become: True
+  tasks:
+    - name: Ensure Jenkins repository is added
+      yum_repository:
+        name: jenkins-ci
+        description: jenkins-ci package repository
+        baseurl: http://pkg.jenkins.io/redhat
+        gpgkey: https://pkg.jenkins.io/redhat/jenkins.io.key
+        gpgcheck: yes
+    - name: Ensure gpp key is imported
+      rpm_key:
+        state: present
+        key: https://pkg.jenkins.io/redhat/jenkins.io.key
+    - name: Ensure Jenkins and java-devel package installed
+      yum:
+        name: '{{ packages }}'
+        state: present
+        update_cache: true
+      vars:
+        packages:
+          - java-devel
+          - epel-release
+          - daemonize
+          - jenkins
+          - maven2
+          - docker
+          - git
+    - name: Ensure systemd daemon reloaded
+      command: systemctl daemon-reload
+    - name: Ensure Jenkins service is enabled and started
+      service:
+        name: jenkins
+        state: started
+    - name: Ensure jenkins service added to firewalld
+      firewalld:
+        service: jenkins
+        state: enabled
+        permanent: yes
+        immediate: yes
+    - name: Ensure port 8080 added to firewalld
+      firewalld:
+        port: 8080/tcp
+        state: enabled
+        permanent: yes
+        immediate: yes
+
+- name: Show jenkins password
+  hosts: new_instances
+  connection: ssh
+  become_user: root
+  become_method: sudo
+  become: True
+  tasks:
+    - command: sudo more /var/lib/jenkins/secrets/initialAdminPassword
+      register: jenkinspwd
+    - debug:
+        msg: "Jenkins initial password: '{{ jenkinspwd.stdout }}'"
