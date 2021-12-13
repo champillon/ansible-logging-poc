@@ -61,8 +61,38 @@
 
     - name: Add host to groupname
       add_host: hostname={{ address.address }} groupname=new_instances
-      
-- name: Manage new instances
+          
+- name: Create Provision user
   hosts: new_instances
   connection: ssh
   become: True
+  become_method: sudo
+  become_user: root
+  gather_facts: no
+  vars:
+    - provision_password: '$1$SomeSalt$UqddPX3r4kH3UL5jq5/ZI.'
+#password: "This is my Password"
+  tasks:
+    - name: Add a new user named provision
+      user:
+        name=provision
+        password={{ provision_password }}
+    - name: Enable PasswordAuthentication 
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: '^PasswordAuthentication'
+        line: "PasswordAuthentication yes"
+        state: present
+        backup: yes
+    - name: Disable ChallengeResponseAuthentication 
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: '^ChallengeResponseAuthentication'
+        line: "ChallengeResponseAuthentication no"
+        state: present
+        backup: yes
+    - name: restart ssh
+      service:
+        name: sshd
+        state: restarted
+    
