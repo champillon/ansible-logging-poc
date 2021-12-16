@@ -91,6 +91,19 @@
         line: "ChallengeResponseAuthentication no"
         state: present
         backup: yes
+    - name: Ensure docker package installed
+      yum:
+        name: '{{ packages }}'
+        state: present
+        update_cache: true
+      vars:
+        packages:
+          - docker
+    - name: "Starting docker service"
+      service:
+        name: "docker"
+        state: started
+        enabled: yes
     - name: restart ssh
       service:
         name: sshd

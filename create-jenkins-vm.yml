@@ -110,6 +110,11 @@
           - maven2
           - docker
           - git
+    - name: "Starting docker service"
+      service:
+        name: "docker"
+        state: started
+        enabled: yes
     - name: Ensure systemd daemon reloaded
       command: systemctl daemon-reload
     - name: Ensure Jenkins service is enabled and started
