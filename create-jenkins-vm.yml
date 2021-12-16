@@ -115,6 +115,11 @@
         name: "docker"
         state: started
         enabled: yes
+    - name: "Grant docker permission to jenkins"
+      file:
+        path: /run/docker.sock
+        owner: root
+        group: jenkins
     - name: Ensure systemd daemon reloaded
       command: systemctl daemon-reload
     - name: Ensure Jenkins service is enabled and started
