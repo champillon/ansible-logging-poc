@@ -104,6 +104,16 @@
         name: "docker"
         state: started
         enabled: yes
+    - name: "Grant docker permission to jenkins"
+      file:
+        path: /run/docker.sock
+        owner: root
+        group: provision
+    - name: "Starting docker service"
+      service:
+        name: "docker"
+        state: started
+        enabled: yes
     - name: restart ssh
       service:
         name: sshd
