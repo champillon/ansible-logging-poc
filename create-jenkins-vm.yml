@@ -110,6 +110,13 @@
           - maven2
           - docker
           - git
+    - name: Removed Red Hat Repository
+      lineinfile:
+        dest: /etc/containers/registries.conf
+        regexp: '^registries = '
+        line: "registries = ['docker.io']"
+        state: present
+        backup: yes
     - name: "Starting docker service"
       service:
         name: "docker"
