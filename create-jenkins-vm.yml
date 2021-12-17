@@ -113,7 +113,7 @@
     - name: Removed Red Hat Repository
       lineinfile:
         dest: /etc/containers/registries.conf
-        regexp: '^registries = '
+        regexp: ^registries = \['re
         line: "registries = ['docker.io']"
         state: present
         backup: yes
