@@ -7,13 +7,14 @@
       gcp_cred_file: "/Users/champillon/SandBox/ansible-playground/gcp-key/openshift-demo-320707-46b48f11b55a.json"
       zone: "us-central1-a"
       region: "us-central1"
+      image: "projects/rhel-cloud/global/images/rhel-7-v20220119"
 
   tasks:
     - name: create a disk
       gcp_compute_disk:
          name: 'runtime-disk'
          size_gb: 50
-         source_image: 'projects/rhel-cloud/global/images/rhel-7-v20211105'
+         source_image: "{{ image }}"
          zone: "{{ zone }}"
          project: "{{ gcp_project }}"
          auth_kind: "{{ gcp_cred_kind }}"
