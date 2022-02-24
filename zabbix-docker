@@ -35,3 +35,5 @@ docker run --name zabbix-web-nginx-mysql -t \
       --network=zabbix-net \
       -p 80:8080 \
       -d zabbix/zabbix-web-nginx-mysql:alpine-5.4-latest
+
+#username:password Admin:zabbix
