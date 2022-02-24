@@ -1,0 +1,114 @@
+- name: Create an instance
+  hosts: localhost
+  gather_facts: no
+  vars:
+      gcp_project: openshift-demo-320707
+      gcp_cred_kind: serviceaccount
+      gcp_cred_file: "/Users/champillon/SandBox/ansible-playground/gcp-key/openshift-demo-320707-46b48f11b55a.json"
+      zone: "asia-southeast1-b"
+      region: "asia-southeast1"
+      image: "projects/rhel-cloud/global/images/rhel-7-v20220119"
+
+  tasks:
+    - name: create a disk
+      gcp_compute_disk:
+         name: 'zabbix-disk'
+         size_gb: 50
+         source_image: "{{ image }}"
+         zone: "{{ zone }}"
+         project: "{{ gcp_project }}"
+         auth_kind: "{{ gcp_cred_kind }}"
+         service_account_file: "{{ gcp_cred_file }}"
+         scopes:
+           - https://www.googleapis.com/auth/compute
+         state: present
+      register: disk
+    - name: create a address
+      gcp_compute_address:
+         name: 'zabbix-address'
+         region: "{{ region }}"
+         project: "{{ gcp_project }}"
+         auth_kind: "{{ gcp_cred_kind }}"
+         service_account_file: "{{ gcp_cred_file }}"
+         scopes:
+           - https://www.googleapis.com/auth/compute
+         state: present
+      register: address
+    - name: create a firewall
+      gcp_compute_firewall:
+        name: 'zabbix-firewall'
+        allowed:
+          - ip_protocol: 'tcp'
+            ports:
+              - "80"
+              - "10051"
+        target_tags:
+          - http-zabbix
+        project: "{{ gcp_project }}"
+        auth_kind: "{{ gcp_cred_kind }}"
+        service_account_file: "{{ gcp_cred_file }}"
+        scopes:
+           - https://www.googleapis.com/auth/compute
+        state: present
+    - name: create a instance
+      gcp_compute_instance:
+        state: present
+        name: zabbix-vm
+        machine_type: n1-standard-1
+        disks:
+          - auto_delete: true
+            boot: true
+            source: "{{ disk }}"
+        network_interfaces:
+            - network: null # use default
+              access_configs:
+                - name: 'External NAT'
+                  nat_ip: "{{ address }}"
+                  type: 'ONE_TO_ONE_NAT'
+        zone: "{{ zone }}"
+        project: "{{ gcp_project }}"
+        auth_kind: "{{ gcp_cred_kind }}"
+        service_account_file: "{{ gcp_cred_file }}"
+        scopes:
+          - https://www.googleapis.com/auth/compute
+        tags:
+          items:
+            - http-zabbix
+      register: instance
+
+    - name: Wait for SSH to come up
+      wait_for: host={{ address.address }} port=22 delay=10 timeout=60
+
+    - name: Add host to groupname
+      add_host: hostname={{ address.address }} groupname=new_instances
+
+- name: Install Zabbix
+  hosts: new_instances
+  connection: ssh
+  become: True
+  vars:
+    docker_network_name: zabbix-net
+
+  tasks:
+    - name: Ensure docker package installed
+      yum:
+        name: '{{ packages }}'
+        state: present
+        update_cache: true
+      vars:
+        packages:
+          - docker
+    - name: Removed Red Hat Repository
+      lineinfile:
+        dest: /etc/containers/registries.conf
+        regexp: ^registries = \['re
+        line: "registries = ['docker.io']"
+        state: present
+        backup: yes
+    - name: "Starting docker service"
+      service:
+        name: "docker"
+        state: started
+        enabled: yes
+    - name: Ensure systemd daemon reloaded
+      command: systemctl daemon-reload
