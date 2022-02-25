@@ -100,4 +100,5 @@
     # - name: Run Installation
     #   become: true
     #   command: "sudo /tmp/ansible-tower-setup-3.8.5-2/setup.sh"
-    # j,.5B}5\Fa87mJu
+    #
+    # change admin password command: tower-manage changepassword admin
