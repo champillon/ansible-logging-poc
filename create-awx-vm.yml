@@ -1,0 +1,183 @@
+- name: Create an instance
+  hosts: localhost
+  gather_facts: no
+  vars:
+      gcp_project: openshift-demo-320707
+      gcp_cred_kind: serviceaccount
+      gcp_cred_file: "/Users/champillon/SandBox/ansible-playground/gcp-key/openshift-demo-320707-46b48f11b55a.json"
+      zone: "asia-southeast1-a"
+      region: "asia-southeast1"
+      image: "projects/rhel-cloud/global/images/rhel-7-v20220119"
+      vm_name: "awx"
+
+  tasks:
+    - name: create a disk
+      gcp_compute_disk:
+         name: '{{ vm_name }}-disk'
+         size_gb: 50
+         source_image: "{{ image }}"
+         zone: "{{ zone }}"
+         project: "{{ gcp_project }}"
+         auth_kind: "{{ gcp_cred_kind }}"
+         service_account_file: "{{ gcp_cred_file }}"
+         scopes:
+           - https://www.googleapis.com/auth/compute
+         state: present
+      register: disk
+    - name: create a address
+      gcp_compute_address:
+         name: '{{ vm_name }}-address'
+         region: "{{ region }}"
+         project: "{{ gcp_project }}"
+         auth_kind: "{{ gcp_cred_kind }}"
+         service_account_file: "{{ gcp_cred_file }}"
+         scopes:
+           - https://www.googleapis.com/auth/compute
+         state: present
+      register: address
+    - name: create a firewall
+      gcp_compute_firewall:
+        name: '{{ vm_name }}-firewall'
+        allowed:
+          - ip_protocol: 'tcp'
+            ports:
+              - "80"
+        target_tags:
+          - http-80
+        project: "{{ gcp_project }}"
+        auth_kind: "{{ gcp_cred_kind }}"
+        service_account_file: "{{ gcp_cred_file }}"
+        scopes:
+           - https://www.googleapis.com/auth/compute
+        state: present
+    - name: create a instance
+      gcp_compute_instance:
+        state: present
+        name: '{{ vm_name }}-vm'
+        machine_type: e2-medium
+        disks:
+          - auto_delete: true
+            boot: true
+            source: "{{ disk }}"
+        network_interfaces:
+            - network: null # use default
+              access_configs:
+                - name: 'External NAT'
+                  nat_ip: "{{ address }}"
+                  type: 'ONE_TO_ONE_NAT'
+        zone: "{{ zone }}"
+        project: "{{ gcp_project }}"
+        auth_kind: "{{ gcp_cred_kind }}"
+        service_account_file: "{{ gcp_cred_file }}"
+        scopes:
+          - https://www.googleapis.com/auth/compute
+        tags:
+          items:
+            - http-80
+      register: instance
+
+    - name: Wait for SSH to come up
+      wait_for: host={{ address.address }} port=22 delay=10 timeout=60
+
+    - name: Add host to groupname
+      add_host: hostname={{ address.address }} groupname=new_instances
+          
+- name: Create Provision user
+  hosts: new_instances
+  connection: ssh
+  become: True
+  become_method: sudo
+  become_user: root
+  gather_facts: no
+  vars:
+    - provision_password: '$1$SomeSalt$UqddPX3r4kH3UL5jq5/ZI.'
+#password: "This is my Password"
+  tasks:
+    - name: Disable SELinux
+      selinux:
+        state: disabled
+    - name: Ensure required package install
+      yum:
+        name: '{{ packages }}'
+        state: present
+        update_cache: true
+      vars:
+        packages:
+          - epel-release
+          - ansible
+          - nodejs
+          - gettext
+          - device-mapper-persistent-data
+          - lvm2
+          - bzip2
+          - python3-pip
+          - wget
+          - nano
+          - gcc-c++
+          - gcc
+          - docker
+          - git
+    - name: Ensure docker service is enabled and started
+      service:
+        name: docker
+        state: started
+    - name: Ensure install pip_setuptools
+      shell: pip3 install -U pip setuptools 
+      register: pip_setuptools_install
+    - name: Print result of pip_setuptools_install
+      debug:
+        msg: "result: {{ pip_setuptools_install }}"
+    - name: Ensure install docker-compose
+      shell: pip3 install docker-compose
+      register: docker_compose_install
+    - name: Print result of docker_compose_install
+      debug:
+        msg: "result: {{ docker_compose_install }}"
+    - name: Ensure root can run docker-compose
+      shell: ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+      register: docker_compose_root
+    - name: Print result of docker_compose_root
+      debug:
+        msg: "result: {{ docker_compose_root }}"
+    - name: Unconditionally reboot the machine with all defaults
+      reboot:
+    - name: Clone awx on git
+      git:
+        repo: https://github.com/ansible/awx.git
+        dest: /root/awx
+        force: yes
+        version: 17.1.0
+    - name: Copy inventory file
+      copy:
+        src: awx_inventory
+        dest: /root/awx/installer/inventory
+        mode: 777
+    - name: Run awx
+      shell: ansible-playbook -i ~/awx/installer/inventory ~/awx/installer/install.yml
+      register: awx_run
+    - name: Print result of awx_run
+      debug:
+        msg: "result: {{ awx_run }}"
+    - name: Add a new user named provision
+      user:
+        name=provision
+        password={{ provision_password }}
+    - name: Enable PasswordAuthentication 
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: '^PasswordAuthentication'
+        line: "PasswordAuthentication yes"
+        state: present
+        backup: yes
+    - name: Disable ChallengeResponseAuthentication 
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: '^ChallengeResponseAuthentication'
+        line: "ChallengeResponseAuthentication no"
+        state: present
+        backup: yes
+    - name: restart ssh
+      service:
+        name: sshd
+        state: restarted
+    
