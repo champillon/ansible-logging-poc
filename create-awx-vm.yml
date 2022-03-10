@@ -96,6 +96,8 @@
     - name: Disable SELinux
       selinux:
         state: disabled
+    - name: Unconditionally reboot the machine with all defaults
+      reboot:
     - name: Ensure required package install
       yum:
         name: '{{ packages }}'
@@ -139,8 +141,6 @@
     - name: Print result of docker_compose_root
       debug:
         msg: "result: {{ docker_compose_root }}"
-    - name: Unconditionally reboot the machine with all defaults
-      reboot:
     - name: Clone awx on git
       git:
         repo: https://github.com/ansible/awx.git
