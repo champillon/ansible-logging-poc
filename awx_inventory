@@ -87,7 +87,7 @@ docker_compose_dir="/var/lib/awx/awxcompose”"
 pg_username=awx
 # pg_password should be random 10 character alphanumeric string, when postgresql is running on kubernetes
 # NB: it's a limitation of the "official" postgres helm chart
-pg_password=welcome1
+pg_password=Password@123
 pg_database=postgres
 pg_port=5432
 #pg_sslmode=require
@@ -105,7 +105,7 @@ pg_port=5432
 # This will create or update a default admin (superuser) account in AWX, if not provided
 # then these default values are used
 admin_user=admin
-admin_password=welcome1
+admin_password=Password@123 
 
 # Whether or not to create preload data for demonstration purposes
 create_preload_data=True
