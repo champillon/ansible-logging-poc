@@ -153,7 +153,7 @@
         dest: /root/awx/installer/inventory
         mode: 777
     # - name: Run awx
-    #   shell: ansible-playbook -i ~/awx/installer/inventory ~/awx/installer/install.yml
+    #   shell: ansible-playbook -i /root/awx/installer/inventory /root/awx/installer/install.yml
     #   register: awx_run
     # - name: Print result of awx_run
     #   debug:
