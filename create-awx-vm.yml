@@ -152,32 +152,10 @@
         src: awx_inventory
         dest: /root/awx/installer/inventory
         mode: 777
-    - name: Run awx
-      shell: ansible-playbook -i ~/awx/installer/inventory ~/awx/installer/install.yml
-      register: awx_run
-    - name: Print result of awx_run
-      debug:
-        msg: "result: {{ awx_run }}"
-    - name: Add a new user named provision
-      user:
-        name=provision
-        password={{ provision_password }}
-    - name: Enable PasswordAuthentication 
-      lineinfile:
-        dest: /etc/ssh/sshd_config
-        regexp: '^PasswordAuthentication'
-        line: "PasswordAuthentication yes"
-        state: present
-        backup: yes
-    - name: Disable ChallengeResponseAuthentication 
-      lineinfile:
-        dest: /etc/ssh/sshd_config
-        regexp: '^ChallengeResponseAuthentication'
-        line: "ChallengeResponseAuthentication no"
-        state: present
-        backup: yes
-    - name: restart ssh
-      service:
-        name: sshd
-        state: restarted
+    # - name: Run awx
+    #   shell: ansible-playbook -i ~/awx/installer/inventory ~/awx/installer/install.yml
+    #   register: awx_run
+    # - name: Print result of awx_run
+    #   debug:
+    #     msg: "result: {{ awx_run }}"
     
