@@ -98,6 +98,28 @@
         state: disabled
     - name: Unconditionally reboot the machine with all defaults
       reboot:
+    - name: Add a new user named provision
+      user:
+        name=provision
+        password={{ provision_password }}
+    - name: Enable PasswordAuthentication 
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: '^PasswordAuthentication'
+        line: "PasswordAuthentication yes"
+        state: present
+        backup: yes
+    - name: Disable ChallengeResponseAuthentication 
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        regexp: '^ChallengeResponseAuthentication'
+        line: "ChallengeResponseAuthentication no"
+        state: present
+        backup: yes
+    - name: restart ssh
+      service:
+        name: sshd
+        state: restarted
     - name: Ensure required package install
       yum:
         name: '{{ packages }}'
