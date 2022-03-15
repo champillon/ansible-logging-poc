@@ -144,16 +144,16 @@
     - name: Clone awx on git
       git:
         repo: https://github.com/ansible/awx.git
-        dest: /root/awx
+        dest: /tmp/awx
         force: yes
         version: 17.1.0
     - name: Copy inventory file
       copy:
         src: awx_inventory
-        dest: /root/awx/installer/inventory
+        dest: /tmp/awx/installer/inventory
         mode: 777
     # - name: Run awx
-    #   shell: ansible-playbook -i /root/awx/installer/inventory /root/awx/installer/install.yml
+    #   shell: ansible-playbook -i /tmp/awx/installer/inventory /tmp/awx/installer/install.yml
     #   register: awx_run
     # - name: Print result of awx_run
     #   debug:
